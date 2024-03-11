@@ -21,6 +21,11 @@ fn derive_named_struct(
     let mut value_locals = Vec::new();
     let mut values = Vec::new();
 
+    let mut default_keys = Vec::new();
+    let mut default_locals = Vec::new();
+    let mut defaults = Vec::new();
+    let mut default_types = Vec::new();
+
     let mut options = Vec::new();
     let mut option_locals = Vec::new();
     let mut option_keys = Vec::new();
@@ -48,13 +53,20 @@ fn derive_named_struct(
         let name = attrs.name(f);
         let name = name.trim_matches(':').trim_matches('"').to_string();
         if is_option {
-            options.push(ident.clone());
+            options.push(ident);
             option_locals.push(format_ident!("__option_{}", id));
             option_keys.push(name);
         } else {
-            values.push(ident);
-            value_locals.push(format_ident!("__value_{}", id));
-            value_keys.push(name);
+            if attrs.default_fallback(f) {
+                default_keys.push(name);
+                default_locals.push(format_ident!("__default_{}", id));
+                defaults.push(ident);
+                default_types.push(&f.ty);
+            } else {
+                value_keys.push(name);
+                value_locals.push(format_ident!("__value_{}", id));
+                values.push(ident);
+            }
         }
     }
 
@@ -75,6 +87,7 @@ fn derive_named_struct(
                 };
 
                 #(let mut #value_locals = None;)*
+                #(let mut #default_locals = None;)*
                 #(let mut #option_locals = None;)*
 
                 for _ in 0..__deser_len {
@@ -85,6 +98,12 @@ fn derive_named_struct(
                                 #value_keys => {
                                     let v = ::simd_json_derive::Deserialize::from_tape(__deser_tape)?;
                                     #value_locals = Some(v);
+                                }
+                                )*
+                                #(
+                                #default_keys => {
+                                    let v = ::simd_json_derive::Deserialize::from_tape(__deser_tape)?;
+                                    #default_locals = Some(v);
                                 }
                                 )*
                                 #(
@@ -108,6 +127,9 @@ fn derive_named_struct(
                 Ok(#ident {
                         #(
                             #options: #option_locals,
+                        )*
+                        #(
+                            #defaults: #default_locals.unwrap_or_else(|| <#default_types>::default()),
                         )*
                         #(
                             #values: #value_locals.ok_or_else(|| ::simd_json::Error::custom(format!("missing field: `{}`", #value_keys)))?,
