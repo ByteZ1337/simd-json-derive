@@ -8,6 +8,7 @@ use syn::{Attribute, Field, Token};
 pub(crate) struct FieldAttrs {
     rename: Option<String>,
     skip_serializing_if: Option<Path>,
+    default: bool,
 }
 
 impl Parse for FieldAttrs {
@@ -30,6 +31,9 @@ impl Parse for FieldAttrs {
                     let path: Path = function.parse()?;
 
                     attrs.skip_serializing_if = Some(path);
+                }
+                "default" => {
+                    attrs.default = true;
                 }
                 "borrow" => (),
                 other => {
@@ -117,6 +121,7 @@ impl RenameAll {
 pub(crate) struct StructAttrs {
     rename_all: RenameAll,
     deny_unknown_fields: bool,
+    default: bool,
 }
 
 impl Default for StructAttrs {
@@ -124,6 +129,7 @@ impl Default for StructAttrs {
         StructAttrs {
             rename_all: RenameAll::None,
             deny_unknown_fields: false,
+            default: false,
         }
     }
 }
@@ -132,6 +138,7 @@ impl Parse for StructAttrs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut rename_all = RenameAll::None;
         let mut deny_unknown_fields = false;
+        let mut default = false;
         while !input.is_empty() {
             let attr: Ident = input.parse()?;
             match attr.to_string().as_str() {
@@ -153,6 +160,9 @@ impl Parse for StructAttrs {
                 "deny_unknown_fields" => {
                     deny_unknown_fields = true;
                 }
+                "default" => {
+                    default = true;
+                }
                 other => {
                     return Err(syn::Error::new(
                         attr.span(),
@@ -167,6 +177,7 @@ impl Parse for StructAttrs {
         Ok(StructAttrs {
             rename_all,
             deny_unknown_fields,
+            default,
         })
     }
 }
@@ -241,6 +252,24 @@ impl StructAttrs {
         } else {
             let v = variant.ident.to_string();
             format!("{}:", OwnedValue::from(self.rename_all.apply(&v)).encode())
+        }
+    }
+    
+    pub(crate) fn default_fallback(&self, field: &Field) -> bool {
+        if self.default {
+            true
+        } else if let Some(attr) = get_attr(&field.attrs, "simd_json")
+            .map(field_attrs)
+            .and_then(|a| Some(a.default))
+        {
+            attr
+        } else if let Some(attr) = get_attr(&field.attrs, "serde")
+            .map(field_attrs)
+            .and_then(|a| Some(a.default))
+        {
+            attr
+        } else {
+            false
         }
     }
 }
