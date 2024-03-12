@@ -45,7 +45,7 @@ fn derive_named_struct(
         }
 
         let ident = f.ident.clone().expect("Missing ident");
-        let name = attrs.name(f);
+        let name = attrs.name_field(f);
         let name = name.trim_matches(':').trim_matches('"').to_string();
         if is_option {
             options.push(ident.clone());
@@ -156,7 +156,7 @@ fn derive_unnamed_struct(
 }
 
 fn derive_enum(
-    _attrs: StructAttrs,
+    attrs: StructAttrs,
     ident: Ident,
     generics: Generics,
     data: DataEnum,
@@ -196,7 +196,7 @@ fn derive_enum(
             (
                 &s.ident,
                 (
-                    s.ident.to_string(),
+                    attrs.name_variant(&s),
                     s.fields
                         .iter()
                         .enumerate()
@@ -240,7 +240,7 @@ fn derive_enum(
     // unnamed 1
     let (unnamed1_keys, unnamed1_values): (Vec<_>, Vec<_>) = unnamed1
         .iter()
-        .map(|s| (&s.ident, s.ident.to_string()))
+        .map(|s| (&s.ident, attrs.name_variant(&s)))
         .unzip();
     let unnamed1 = quote! {
         #(
@@ -250,7 +250,7 @@ fn derive_enum(
 
     let (simple_keys, simple_values): (Vec<_>, Vec<_>) = simple
         .iter()
-        .map(|s| (&s.ident, s.ident.to_string()))
+        .map(|s| (&s.ident, attrs.name_variant(&s)))
         .unzip();
     let simple = quote! {
         #(

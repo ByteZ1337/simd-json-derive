@@ -1,10 +1,7 @@
 use proc_macro2::{Ident, Literal};
-use simd_json::prelude::*;
 use simd_json::OwnedValue;
-use syn::{
-    parse::{Parse, ParseStream},
-    LitStr, Path,
-};
+use simd_json::prelude::*;
+use syn::{LitStr, parse::{Parse, ParseStream}, Path, Variant};
 use syn::{Attribute, Field, Token};
 
 #[derive(Debug, Default)]
@@ -21,13 +18,13 @@ impl Parse for FieldAttrs {
             let attr: Ident = input.parse()?;
             match attr.to_string().as_str() {
                 "rename" => {
-                    let _eqal_token: Token![=] = input.parse()?;
+                    let _equal_token: Token![=] = input.parse()?;
                     let name: LitStr = input.parse()?;
 
                     attrs.rename = Some(name.value());
                 }
                 "skip_serializing_if" => {
-                    let _eqal_token: Token![=] = input.parse()?;
+                    let _equal_token: Token![=] = input.parse()?;
                     let function: LitStr = input.parse()?;
 
                     let path: Path = function.parse()?;
@@ -39,7 +36,40 @@ impl Parse for FieldAttrs {
                     return Err(syn::Error::new(
                         attr.span(),
                         format!("unexpected attribute `{}`", other),
-                    ))
+                    ));
+                }
+            }
+            if !input.is_empty() {
+                let _comma_token: Token![,] = input.parse()?;
+            }
+        }
+        Ok(attrs)
+    }
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct VariantAttrs {
+    rename: Option<String>,
+}
+
+impl Parse for VariantAttrs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut attrs = VariantAttrs::default();
+
+        while !input.is_empty() {
+            let attr: Ident = input.parse()?;
+            match attr.to_string().as_str() {
+                "rename" => {
+                    let _equal_token: Token![=] = input.parse()?;
+                    let name: LitStr = input.parse()?;
+
+                    attrs.rename = Some(name.value());
+                }
+                other => {
+                    return Err(syn::Error::new(
+                        attr.span(),
+                        format!("unexpected attribute `{}`", other),
+                    ));
                 }
             }
             if !input.is_empty() {
@@ -82,6 +112,7 @@ impl RenameAll {
         }
     }
 }
+
 #[derive(Debug)]
 pub(crate) struct StructAttrs {
     rename_all: RenameAll,
@@ -105,7 +136,7 @@ impl Parse for StructAttrs {
             let attr: Ident = input.parse()?;
             match attr.to_string().as_str() {
                 "rename_all" => {
-                    let _eqal_token: Token![=] = input.parse()?;
+                    let _equal_token: Token![=] = input.parse()?;
                     let name: Literal = input.parse()?;
 
                     match name.to_string().as_str() {
@@ -115,7 +146,7 @@ impl Parse for StructAttrs {
                             return Err(syn::Error::new(
                                 attr.span(),
                                 format!("unexpected rename_all type `{}`", other),
-                            ))
+                            ));
                         }
                     }
                 }
@@ -126,7 +157,7 @@ impl Parse for StructAttrs {
                     return Err(syn::Error::new(
                         attr.span(),
                         format!("unexpected field attribute `{}`", other),
-                    ))
+                    ));
                 }
             }
             if !input.is_empty() {
@@ -142,6 +173,11 @@ impl Parse for StructAttrs {
 
 pub(crate) fn field_attrs(attr: &Attribute) -> FieldAttrs {
     attr.parse_args::<FieldAttrs>()
+        .expect("failed to parse attributes")
+}
+
+pub(crate) fn variant_attrs(attr: &Attribute) -> VariantAttrs {
+    attr.parse_args::<VariantAttrs>()
         .expect("failed to parse attributes")
 }
 
@@ -170,7 +206,7 @@ impl StructAttrs {
             .map(field_attrs)
             .and_then(|a| a.skip_serializing_if)
     }
-    pub(crate) fn name(&self, field: &Field) -> String {
+    pub(crate) fn name_field(&self, field: &Field) -> String {
         if let Some(attr) = get_attr(&field.attrs, "simd_json")
             .map(field_attrs)
             .and_then(|a| a.rename)
@@ -188,6 +224,23 @@ impl StructAttrs {
                 .expect("Field is missing ident")
                 .to_string();
             format!("{}:", OwnedValue::from(self.rename_all.apply(&f)).encode())
+        }
+    }
+
+    pub(crate) fn name_variant(&self, variant: &Variant) -> String {
+        if let Some(attr) = get_attr(&variant.attrs, "simd_json")
+            .map(variant_attrs)
+            .and_then(|a| a.rename)
+        {
+            format!("{}:", OwnedValue::from(attr).encode())
+        } else if let Some(attr) = get_attr(&variant.attrs, "serde")
+            .map(variant_attrs)
+            .and_then(|a| a.rename)
+        {
+            format!("{}:", OwnedValue::from(attr).encode())
+        } else {
+            let v = variant.ident.to_string();
+            format!("{}:", OwnedValue::from(self.rename_all.apply(&v)).encode())
         }
     }
 }
