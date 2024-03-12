@@ -232,15 +232,15 @@ impl StructAttrs {
             .map(variant_attrs)
             .and_then(|a| a.rename)
         {
-            format!("{}:", OwnedValue::from(attr).encode())
+            format!("{}", attr)
         } else if let Some(attr) = get_attr(&variant.attrs, "serde")
             .map(variant_attrs)
             .and_then(|a| a.rename)
         {
-            format!("{}:", OwnedValue::from(attr).encode())
+            format!("{}", attr)
         } else {
             let v = variant.ident.to_string();
-            format!("{}:", OwnedValue::from(self.rename_all.apply(&v)).encode())
+            format!("{}", self.rename_all.apply(&v))
         }
     }
 }
