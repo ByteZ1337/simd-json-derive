@@ -49,6 +49,7 @@ where
             Some(simd_json::Node::Array { len, .. }) => {
                 let mut res = Vec::with_capacity(len);
                 unsafe {
+                    res.set_len(len);
                     for i in 0..len {
                         match T::from_tape(tape) {
                             Ok(t) => std::ptr::write(res.get_unchecked_mut(i), t),
