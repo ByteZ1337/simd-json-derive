@@ -1,11 +1,14 @@
-use std::ops::Range;
+use std::{
+    collections::{BTreeMap, HashMap},
+    ops::Range,
+};
 
 #[cfg(feature = "heap-array")]
 use heap_array::HeapArray;
 
-use crate::*;
-use collections::BTreeMap;
-use collections::HashMap;
+use crate::{de, Deserialize, Result, Serialize, SerializeAsKey, Tape, Write};
+use std::collections;
+use std::io;
 
 macro_rules! vec_like {
     ($t:ty) => {
@@ -41,32 +44,19 @@ where
     T: Deserialize<'input>,
 {
     #[inline]
-    fn from_tape(tape: &mut Tape<'input>) -> simd_json::Result<Self>
+    fn from_tape(tape: &mut Tape<'input>) -> de::Result<Self>
     where
         Self: Sized + 'input,
     {
-        match tape.next() {
-            Some(simd_json::Node::Array { len, .. }) => {
-                let mut res = Vec::with_capacity(len);
-                unsafe {
-                    res.set_len(len);
-                    for i in 0..len {
-                        match T::from_tape(tape) {
-                            Ok(t) => std::ptr::write(res.get_unchecked_mut(i), t),
-                            Err(e) => {
-                                res.set_len(i);
-                                return Err(e);
-                            }
-                        }
-                    }
-                    res.set_len(len);
-                }
-                Ok(res)
-            }
-            _other => Err(simd_json::Error::generic(
-                simd_json::ErrorType::ExpectedArray,
-            )),
+        let Some(simd_json::Node::Array { len, .. }) = tape.next() else {
+            return Err(de::Error::expected_array());
+        };
+        let mut res = Vec::with_capacity(len);
+        for _ in 0..len {
+            let t = T::from_tape(tape)?;
+            res.push(t);
         }
+        Ok(res)
     }
 }
 
@@ -77,7 +67,7 @@ where
     T: Deserialize<'input>,
 {
     #[inline]
-    fn from_tape(tape: &mut Tape<'input>) -> simd_json::Result<Self>
+    fn from_tape(tape: &mut Tape<'input>) -> de::Result<Self>
     where
         Self: Sized + 'input,
     {
@@ -88,9 +78,7 @@ where
             }
             Ok(v)
         } else {
-            Err(simd_json::Error::generic(
-                simd_json::ErrorType::ExpectedArray,
-            ))
+            Err(de::Error::expected_array())
         }
     }
 }
@@ -100,7 +88,7 @@ where
     T: Deserialize<'input> + Ord,
 {
     #[inline]
-    fn from_tape(tape: &mut Tape<'input>) -> simd_json::Result<Self>
+    fn from_tape(tape: &mut Tape<'input>) -> de::Result<Self>
     where
         Self: Sized + 'input,
     {
@@ -111,9 +99,7 @@ where
             }
             Ok(v)
         } else {
-            Err(simd_json::Error::generic(
-                simd_json::ErrorType::ExpectedArray,
-            ))
+            Err(de::Error::expected_array())
         }
     }
 }
@@ -123,7 +109,7 @@ where
     T: Deserialize<'input> + Ord,
 {
     #[inline]
-    fn from_tape(tape: &mut Tape<'input>) -> simd_json::Result<Self>
+    fn from_tape(tape: &mut Tape<'input>) -> de::Result<Self>
     where
         Self: Sized + 'input,
     {
@@ -134,9 +120,7 @@ where
             }
             Ok(v)
         } else {
-            Err(simd_json::Error::generic(
-                simd_json::ErrorType::ExpectedArray,
-            ))
+            Err(de::Error::expected_array())
         }
     }
 }
@@ -146,7 +130,7 @@ where
     T: Deserialize<'input> + Ord,
 {
     #[inline]
-    fn from_tape(tape: &mut Tape<'input>) -> simd_json::Result<Self>
+    fn from_tape(tape: &mut Tape<'input>) -> de::Result<Self>
     where
         Self: Sized + 'input,
     {
@@ -157,9 +141,7 @@ where
             }
             Ok(v)
         } else {
-            Err(simd_json::Error::generic(
-                simd_json::ErrorType::ExpectedArray,
-            ))
+            Err(de::Error::expected_array())
         }
     }
 }
@@ -193,7 +175,7 @@ where
     H: std::hash::BuildHasher + Default,
 {
     #[inline]
-    fn from_tape(tape: &mut Tape<'input>) -> simd_json::Result<Self>
+    fn from_tape(tape: &mut Tape<'input>) -> de::Result<Self>
     where
         Self: Sized + 'input,
     {
@@ -204,9 +186,7 @@ where
             }
             Ok(v)
         } else {
-            Err(simd_json::Error::generic(
-                simd_json::ErrorType::ExpectedArray,
-            ))
+            Err(de::Error::expected_array())
         }
     }
 }
@@ -250,7 +230,7 @@ where
     H: std::hash::BuildHasher + Default,
 {
     #[inline]
-    fn from_tape(tape: &mut Tape<'input>) -> simd_json::Result<Self>
+    fn from_tape(tape: &mut Tape<'input>) -> de::Result<Self>
     where
         Self: Sized + 'input,
     {
@@ -262,7 +242,7 @@ where
             }
             Ok(v)
         } else {
-            Err(simd_json::Error::generic(simd_json::ErrorType::ExpectedMap))
+            Err(de::Error::expected_map())
         }
     }
 }
@@ -273,7 +253,7 @@ where
     V: Deserialize<'input>,
 {
     #[inline]
-    fn from_tape(tape: &mut Tape<'input>) -> simd_json::Result<Self>
+    fn from_tape(tape: &mut Tape<'input>) -> de::Result<Self>
     where
         Self: Sized + 'input,
     {
@@ -285,7 +265,7 @@ where
             }
             Ok(v)
         } else {
-            Err(simd_json::Error::generic(simd_json::ErrorType::ExpectedMap))
+            Err(de::Error::expected_map())
         }
     }
 }
@@ -312,7 +292,7 @@ where
     T: Deserialize<'input>,
 {
     #[inline]
-    fn from_tape(tape: &mut Tape<'input>) -> simd_json::Result<Self>
+    fn from_tape(tape: &mut Tape<'input>) -> de::Result<Self>
     where
         Self: Sized + 'input,
     {
@@ -324,9 +304,7 @@ where
                         let end = Deserialize::from_tape(tape)?;
                         Ok(start..end)
                     } else {
-                        Err(simd_json::Error::generic(
-                            simd_json::ErrorType::ExpectedString,
-                        ))
+                        Err(de::Error::expected_string())
                     }
                 }
                 Some(simd_json::Node::String("end")) => {
@@ -335,17 +313,13 @@ where
                         let start = Deserialize::from_tape(tape)?;
                         Ok(start..end)
                     } else {
-                        Err(simd_json::Error::generic(
-                            simd_json::ErrorType::ExpectedString,
-                        ))
+                        Err(de::Error::expected_string())
                     }
                 }
-                _ => Err(simd_json::Error::generic(
-                    simd_json::ErrorType::ExpectedString,
-                )),
+                _ => Err(de::Error::expected_string()),
             }
         } else {
-            Err(simd_json::Error::generic(simd_json::ErrorType::ExpectedMap))
+            Err(de::Error::expected_map())
         }
     }
 }
@@ -355,16 +329,14 @@ vec_like!(HeapArray<T>);
 
 #[cfg(feature = "heap-array")]
 impl<'input, T: Deserialize<'input>> Deserialize<'input> for HeapArray<T> {
-    fn from_tape(tape: &mut Tape<'input>) -> simd_json::Result<Self>
+    fn from_tape(tape: &mut Tape<'input>) -> de::Result<Self>
     where
         Self: Sized + 'input,
     {
         if let Some(simd_json::Node::Array { len, .. }) = tape.next() {
             HeapArray::try_from_fn(len, |_| T::from_tape(tape))
         } else {
-            Err(simd_json::Error::generic(
-                simd_json::ErrorType::ExpectedArray,
-            ))
+            Err(de::Error::expected_array())
         }
     }
 }

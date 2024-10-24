@@ -29,16 +29,14 @@ impl<Tz: TimeZone> Serialize for DateTime<Tz> {
 
 impl<'input> Deserialize<'input> for DateTime<FixedOffset> {
     #[inline]
-    fn from_tape(tape: &mut Tape<'input>) -> simd_json::Result<Self>
+    fn from_tape(tape: &mut Tape<'input>) -> de::Result<Self>
     where
         Self: Sized + 'input,
     {
         match tape.next() {
             Some(simd_json::Node::String(s)) => DateTime::parse_from_rfc2822(s)
-                .map_err(|_| simd_json::Error::generic(simd_json::ErrorType::ExpectedString)),
-            _ => Err(simd_json::Error::generic(
-                simd_json::ErrorType::ExpectedString,
-            )),
+                .map_err(|e| de::Error::custom(format!("Invalid date string `{s}`: {e}"))),
+            _ => Err(de::Error::expected_string()),
         }
     }
 }

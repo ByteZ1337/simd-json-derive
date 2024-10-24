@@ -1,4 +1,4 @@
-use crate::*;
+use crate::{de, Deserialize, Result, Serialize, Tape, Write};
 use std::convert::TryFrom;
 
 impl Serialize for bool {
@@ -13,13 +13,11 @@ impl Serialize for bool {
 
 impl<'input> Deserialize<'input> for bool {
     #[inline]
-    fn from_tape(tape: &mut Tape<'input>) -> simd_json::Result<bool> {
+    fn from_tape(tape: &mut Tape<'input>) -> de::Result<bool> {
         if let Some(simd_json::Node::Static(simd_json::StaticNode::Bool(r))) = tape.next() {
             Ok(r)
         } else {
-            Err(simd_json::Error::generic(
-                simd_json::ErrorType::ExpectedBoolean,
-            ))
+            Err(de::Error::expected_boolean())
         }
     }
 }
@@ -28,7 +26,7 @@ macro_rules! itoa {
     ($t:ty) => {
         impl Serialize for $t {
             #[inline]
-            fn json_write<W>(&self, writer: &mut W) -> io::Result<()>
+            fn json_write<W>(&self, writer: &mut W) -> std::io::Result<()>
             where
                 W: Write,
             {
@@ -40,36 +38,26 @@ macro_rules! itoa {
 
         impl<'input> Deserialize<'input> for $t {
             #[inline]
-            fn from_tape(tape: &mut Tape<'input>) -> simd_json::Result<Self>
+            fn from_tape(tape: &mut Tape<'input>) -> de::Result<Self>
             where
                 Self: std::marker::Sized + 'input,
             {
                 match tape.next() {
                     Some(simd_json::Node::Static(simd_json::StaticNode::I64(i))) => {
-                        <$t>::try_from(i).map_err(|_| {
-                            simd_json::Error::generic(simd_json::ErrorType::ExpectedInteger)
-                        })
+                        <$t>::try_from(i).map_err(de::Error::from)
                     }
                     Some(simd_json::Node::Static(simd_json::StaticNode::U64(i))) => {
-                        <$t>::try_from(i).map_err(|_| {
-                            simd_json::Error::generic(simd_json::ErrorType::ExpectedInteger)
-                        })
+                        <$t>::try_from(i).map_err(de::Error::from)
                     }
                     #[cfg(feature = "128bit")]
                     Some(simd_json::Node::Static(simd_json::StaticNode::U128(i))) => {
-                        <$t>::try_from(i).map_err(|_| {
-                            simd_json::Error::generic(simd_json::ErrorType::ExpectedInteger)
-                        })
+                        <$t>::try_from(i).map_err(de::Error::from)
                     }
                     #[cfg(feature = "128bit")]
                     Some(simd_json::Node::Static(simd_json::StaticNode::I128(i))) => {
-                        <$t>::try_from(i).map_err(|_| {
-                            simd_json::Error::generic(simd_json::ErrorType::ExpectedInteger)
-                        })
+                        <$t>::try_from(i).map_err(de::Error::from)
                     }
-                    _ => Err(simd_json::Error::generic(
-                        simd_json::ErrorType::ExpectedInteger,
-                    )),
+                    _ => Err(de::Error::expected_integer()),
                 }
             }
         }
@@ -92,7 +80,7 @@ macro_rules! ryu {
     ($t:ty) => {
         impl Serialize for $t {
             #[inline]
-            fn json_write<W>(&self, writer: &mut W) -> io::Result<()>
+            fn json_write<W>(&self, writer: &mut W) -> std::io::Result<()>
             where
                 W: Write,
             {
@@ -108,7 +96,7 @@ ryu!(f32);
 
 impl<'input> Deserialize<'input> for f64 {
     #[inline]
-    fn from_tape(tape: &mut Tape<'input>) -> simd_json::Result<Self>
+    fn from_tape(tape: &mut Tape<'input>) -> de::Result<Self>
     where
         Self: Sized + 'input,
     {
@@ -120,16 +108,14 @@ impl<'input> Deserialize<'input> for f64 {
             Some(simd_json::Node::Static(simd_json::StaticNode::U128(i))) => Ok(i as f64),
             #[cfg(feature = "128bit")]
             Some(simd_json::Node::Static(simd_json::StaticNode::I128(i))) => Ok(i as f64),
-            _ => Err(simd_json::Error::generic(
-                simd_json::ErrorType::ExpectedFloat,
-            )),
+            _ => Err(de::Error::expected_float()),
         }
     }
 }
 
 impl<'input> Deserialize<'input> for f32 {
     #[inline]
-    fn from_tape(tape: &mut Tape<'input>) -> simd_json::Result<Self>
+    fn from_tape(tape: &mut Tape<'input>) -> de::Result<Self>
     where
         Self: Sized + 'input,
     {
@@ -141,9 +127,7 @@ impl<'input> Deserialize<'input> for f32 {
             Some(simd_json::Node::Static(simd_json::StaticNode::U128(i))) => Ok(i as f32),
             #[cfg(feature = "128bit")]
             Some(simd_json::Node::Static(simd_json::StaticNode::I128(i))) => Ok(i as f32),
-            _ => Err(simd_json::Error::generic(
-                simd_json::ErrorType::ExpectedFloat,
-            )),
+            _ => Err(de::Error::expected_float()),
         }
     }
 }

@@ -1,4 +1,4 @@
-use crate::*;
+use crate::{de, Deserialize, Result, Serialize, Tape, Write};
 
 impl Serialize for () {
     #[inline]
@@ -12,16 +12,14 @@ impl Serialize for () {
 
 impl<'input> Deserialize<'input> for () {
     #[inline]
-    fn from_tape(tape: &mut Tape<'input>) -> simd_json::Result<Self>
+    fn from_tape(tape: &mut Tape<'input>) -> de::Result<Self>
     where
         Self: std::marker::Sized + 'input,
     {
         if let Some(simd_json::Node::Static(simd_json::StaticNode::Null)) = tape.next() {
             Ok(())
         } else {
-            Err(simd_json::Error::generic(
-                simd_json::ErrorType::ExpectedNull,
-            ))
+            Err(de::Error::expected_null())
         }
     }
 }
@@ -55,7 +53,7 @@ macro_rules! tuple_impls {
                 $($name: Deserialize<'input>,)+
             {
                 #[inline]
-                fn from_tape(tape: &mut Tape<'input>) -> simd_json::Result<Self>
+                fn from_tape(tape: &mut Tape<'input>) -> de::Result<Self>
                 where
                     Self: std::marker::Sized + 'input,
                 {
@@ -64,9 +62,7 @@ macro_rules! tuple_impls {
                             $($name::from_tape(tape)?,)+
                         ))
                     } else {
-                        Err(simd_json::Error::generic(
-                            simd_json::ErrorType::ExpectedArray,
-                        ))
+                        Err(de::Error::expected_array())
                     }
                 }
             }
