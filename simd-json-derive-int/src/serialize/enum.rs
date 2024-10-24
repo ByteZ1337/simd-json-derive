@@ -30,14 +30,14 @@ pub(crate) fn derive(
         unnamed.into_iter().partition(|v| v.fields.len() == 1);
 
     // enum no fields of Enum::Variant
-    // They serialize as: "Varriant"
+    // They serialize as: "Variant"
 
     let (simple_keys, simple_values): (Vec<_>, Vec<_>) = simple
         .iter()
         .map(|s| {
             (
                 &s.ident,
-                simd_json::OwnedValue::from(s.ident.to_string()).encode(),
+                simd_json::OwnedValue::from(attrs.name_variant(&s)).encode(),
             )
         })
         .unzip();
@@ -61,7 +61,7 @@ pub(crate) fn derive(
                 &v.ident,
                 format!(
                     "{{{}:",
-                    simd_json::OwnedValue::from(v.ident.to_string()).encode()
+                    simd_json::OwnedValue::from(attrs.name_variant(&v)).encode()
                 ),
             )
         })
@@ -94,7 +94,7 @@ pub(crate) fn derive(
                 ),
                 format!(
                     "{{{}:[",
-                    simd_json::OwnedValue::from(v.ident.to_string()).encode()
+                    simd_json::OwnedValue::from(attrs.name_variant(&v)).encode()
                 ),
             )
         })
@@ -141,13 +141,13 @@ pub(crate) fn derive(
         let mut skip_if = Vec::new();
 
         for f in &v.fields {
-            let name = attrs.name(f);
+            let name = attrs.name_field(f);
             let ident = f.ident.clone().expect("Missing ident");
             keys.push(name);
             values.push(ident);
             skip_if.push(attrs.skip_serializing_if(f));
         }
-        let variant_name = simd_json::OwnedValue::from(v.ident.to_string()).encode();
+        let variant_name = simd_json::OwnedValue::from(attrs.name_variant(&v)).encode();
 
         named_bodies.push(if skip_if.iter().all(Option::is_none) {
             let (first_key, rest_keys) = keys.split_first().expect("zero fields");

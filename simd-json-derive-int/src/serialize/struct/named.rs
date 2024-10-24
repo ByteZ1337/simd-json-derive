@@ -18,7 +18,7 @@ pub(crate) fn derive(
 
     for f in &fields {
         let ident = f.ident.clone().expect("Missing ident");
-        let name = attrs.name(f);
+        let name = attrs.name_field(f);
         keys.push(name);
         values.push(ident);
         skip_if.push(attrs.skip_serializing_if(f));

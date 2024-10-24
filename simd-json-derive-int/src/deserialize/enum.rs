@@ -6,7 +6,7 @@ use syn::{DataEnum, Fields, GenericParam, Generics, Variant};
 use crate::args::StructAttrs;
 
 pub(super) fn derive(
-    _attrs: StructAttrs,
+    attrs: StructAttrs,
     ident: Ident,
     generics: Generics,
     data: DataEnum,
@@ -46,7 +46,7 @@ pub(super) fn derive(
             (
                 &s.ident,
                 (
-                    s.ident.to_string(),
+                    attrs.name_variant(&s),
                     s.fields
                         .iter()
                         .enumerate()
@@ -90,7 +90,7 @@ pub(super) fn derive(
     // unnamed 1
     let (unnamed1_keys, unnamed1_values): (Vec<_>, Vec<_>) = unnamed1
         .iter()
-        .map(|s| (&s.ident, s.ident.to_string()))
+        .map(|s| (&s.ident, attrs.name_variant(&s)))
         .unzip();
     let unnamed1 = quote! {
         #(
@@ -100,7 +100,7 @@ pub(super) fn derive(
 
     let (simple_keys, simple_values): (Vec<_>, Vec<_>) = simple
         .iter()
-        .map(|s| (&s.ident, s.ident.to_string()))
+        .map(|s| (&s.ident, attrs.name_variant(&s)))
         .unzip();
     let simple = quote! {
         #(

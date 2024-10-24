@@ -223,6 +223,7 @@ impl StructAttrs {
             .map(field_attrs)
             .and_then(|a| a.skip_serializing_if)
     }
+    
     pub(crate) fn name_field(&self, field: &Field) -> String {
         if let Some(attr) = get_attr(&field.attrs, "simd_json")
             .map(field_attrs)
